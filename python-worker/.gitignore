@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Test artifacts
+tests/fixtures/*.jpg
+tests/fixtures/*.pdf
+test_llamacloud.py
+create_test_files.py
+create_more_test_files.py

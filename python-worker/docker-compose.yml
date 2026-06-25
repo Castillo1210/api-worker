@@ -1,0 +1,113 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.2'
+
+  cloudsql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.0
+    command:
+      - "--port=5432"
+      - "--credentials-file=/secrets/sa-key.json"
+      - "${GCP_PROJECT_ID}:${GCP_REGION}:confirmo-db"
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json
+    volumes:
+      - ./secrets/sa-key.json:/secrets/sa-key.json:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.1'
+
+  python-worker:
+    build: .
+    environment:
+      - DATABASE_HOST=cloudsql-proxy
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=confirmo
+      - DATABASE_USER=confirmo_app
+      - DATABASE_PASSWORD=${DB_PASSWORD}
+      - GCS_BUCKET=${GCS_BUCKET}
+      - LLAMA_PARSER_URL=${LLAMA_PARSER_URL}
+      - LLAMA_PARSER_API_KEY=${LLAMA_PARSER_API_KEY}
+      - API_BRIDGE_URL=http://api-bridge:8080
+      - INTERNAL_SECRET=${INTERNAL_SECRET}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - LOG_LEVEL=INFO
+      - METRICS_PORT=9090
+      - ENVIRONMENT=production
+    depends_on:
+      redis:
+        condition: service_healthy
+      cloudsql-proxy:
+        condition: service_started
+    volumes:
+      - ./models:/app/models:ro
+      - ./logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+          cpus: '1.5'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+      - "9090:9090"
+
+  celery-beat:
+    build: .
+    command: celery -A app.worker beat --loglevel=info --scheduler celery.beat.PersistentScheduler
+    environment:
+      - DATABASE_HOST=cloudsql-proxy
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=confirmo
+      - DATABASE_USER=confirmo_app
+      - DATABASE_PASSWORD=${DB_PASSWORD}
+      - GCS_BUCKET=${GCS_BUCKET}
+      - LLAMA_PARSER_URL=${LLAMA_PARSER_URL}
+      - LLAMA_PARSER_API_KEY=${LLAMA_PARSER_API_KEY}
+      - API_BRIDGE_URL=http://api-bridge:8080
+      - INTERNAL_SECRET=${INTERNAL_SECRET}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - LOG_LEVEL=INFO
+      - ENVIRONMENT=production
+    depends_on:
+      redis:
+        condition: service_healthy
+      cloudsql-proxy:
+        condition: service_started
+    volumes:
+      - celery-beat-data:/app/celerybeat-schedule
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.2'
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  celery-beat-data:

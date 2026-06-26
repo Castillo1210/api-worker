@@ -22,6 +22,7 @@ class CallbackClient:
             "error_ids": result.get("error_ids", []),
             "warning_ids": result.get("warning_ids", []),
             "error_type": result.get("error_type"),
+            "error_message": result.get("error_message"),
             "timestamp": datetime.utcnow().isoformat
         }
 

@@ -1,5 +1,7 @@
 # app/services/business_validator.py
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from uuid import UUID
+from datetime import date, datetime, timedelta
 from app.services.cloudsql_client import CloudSQLClient
 import structlog
 
@@ -7,7 +9,6 @@ logger = structlog.get_logger()
 
 
 class BusinessValidator:
-    """Validaciones de negocio post-IA (hardcodeadas por ahora, movibles a BD después)"""
     def __init__(self, db: CloudSQLClient):
         self.db = db
         self._error_cache: Dict[str, str] = {} # error_code -> UUID
@@ -36,22 +37,20 @@ class BusinessValidator:
             error_ids.append(await self._get_error_id("MONEDA_INVALIDAD"))
         
         # Numero operacion
-        nro_op = data.get("numero_operacion")
-        if not nro_op or not str(nro_op).strip():
+        if not data.get("numero_operacion"):
             error_ids.append(await self._get_error_id("NUMERO_OPERACION_FALTANTE"))
         
         # Fecha
         fecha = data.get("fecha_operacion")
         if fecha:
             try:
-                from datetime import date, datetime, timedelta
                 fecha_obj = datetime.strptime(str(fecha), "%Y-%m-%d").date()
                 if fecha_obj > date.today():
                     error_ids.append(await self._get_error_id("FECHA_FUTURA"))
-                elif fecha_obj < date.today().replace(year=date.today().year - 2):
+                elif fecha_obj < date.today() - timedelta(days=730):
                     error_ids.append(await self._get_error_id("FECHA_MUY_ANTIGUA"))
                 elif fecha_obj < date.today() - timedelta(days=7):
-                    error_ids.append(await self._get_error_id("FECHA_RECIENTE"))
+                    warning_ids.append(await self._get_error_id("FECHA_RECIENTE"))
             except ValueError:
                 error_ids.append(await self._get_error_id("FECHA_INVALIDA"))
         else:
@@ -60,7 +59,7 @@ class BusinessValidator:
         is_valid = len(error_ids) == 0
         requires_review = len(warning_ids) > 0
         
-        logger.info("Validación negocio completada", is_valid=is_valid, error_ids=error_ids, requires_review=requires_review)
+        logger.info("Validación negocio completada", error_count=len(error_ids), warning_count=len(warning_ids), requires_review=requires_review)
         return {
             "error_ids": error_ids,
             "warning_ids": warning_ids,

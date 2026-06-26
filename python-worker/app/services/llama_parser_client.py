@@ -15,7 +15,10 @@ import structlog
 logger = structlog.get_logger()
 
 class LlamaParserError(Exception):
-    pass
+    def __init__(self, message: str, error_code: str = "IA_ERROR_GENERICO", original_error: Exception = None):
+        super().__init__(message)
+        self.error_code = error_code
+        self.original_error = original_error
 
 class LlamaParserClient:
     def __init__(self, schema_registry: SchemaRegistry, cloud_sql_client: CloudSQLClient):
@@ -78,7 +81,9 @@ class LlamaParserClient:
 
         return schema_class, response_class
 
-    async def _extract_with_retry(self, file_path: str, schema_class: Type[BaseModel], response_class: Type[BaseModel]) -> LlamaParserResponse:
+    async def _extract_with_retry(self, file_path: str, schema_class, response_class):
+        last_error = None
+
         for attempt in range(self.max_retries):
             try:
                 logger.info("Llamando LlamaCloud", attempt=attempt + 1)
@@ -96,29 +101,38 @@ class LlamaParserClient:
                     },
                 )
 
-                # 3. Poll para completado
+                # 3. Poll con timeout
+                start_time = time.time()
                 while job.status not in ("COMPLETED", "FAILED", "CANCELLED"):
+                    if time.time() - start_time > self.timeout:
+                        raise LlamaParserError(
+                            f"Timeout después de {self.timeout}s esperando respuesta de LlamaCloud",
+                            error_code="IA_TIMEOUT"
+                        )
                     time.sleep(2)
                     job = self.client.extract.get(job.id)
 
-                # 4. Mejorar respuesta
+                # 4. Manejar respuesta
                 if job.status == "FAILED":
                     error_msg = getattr(job, 'error', 'Unknown error')
-                    # Si hay extract_result en failed, inspeccionarlo
-                    if hasattr(job, 'extract_result') and job.extract_result:
-                        error_msg = str(job.extract_result)
-                    raise LlamaParserError(f"LlamaCloud FAILED: {error_msg}")
+                    # Determinar código de error según el mensaje
+                    if "500" in str(error_msg) or "Internal Server Error" in str(error_msg):
+                        raise LlamaParserError(
+                            f"LlamaCloud error 500: {error_msg}",
+                            error_code="IA_ERROR_500"
+                        )
+                    raise LlamaParserError(f"LlamaCloud FAILED: {error_msg}", error_code="IA_CANCELLED")
                 
                 if job.status == "CANCELLED":
-                    raise LlamaParserError("LlamaCloud job CANCELLED")
+                    raise LlamaParserError("LlamaCloud job CANCELLED", error_code="IA_CANCELLED")
                 
-                # COMPLETED
+                # Éxito - parsear respuesta
                 data = job.extract_result
                 if isinstance(data, BaseModel):
                     data = data.model_dump()
 
                 logger.info("LlamaCloud extracción exitosa", fiels=list(data.keys()))
-                return response_class(**data)
+                return data
             except LlamaParserError:
                 raise
             except Exception as e:
@@ -126,10 +140,9 @@ class LlamaParserClient:
                 logger.warning(
                     "Error en llamada LlamaCloud, reintentando",
                     attemp=attempt + 1,
-                    max_retries=self.max_retries,
                     error=str(e)
                 )
                 if attempt < self.max_retries - 1:
                     wait_time = 2 ** attempt
                     time.sleep(wait_time)
-        raise LlamaParserError(f"Falló tras {self.max_retries} intentos: {last_error}")
+        raise LlamaParserError(f"Falló tras {self.max_retries} intentos: {last_error}", error_code="IA_MAX_RETRIES", original_error=last_error)

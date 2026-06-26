@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     CELERY_TASK_ACKS_LATE: bool = True
     CELERY_TASK_REJECT_ON_WORKER_LOST: bool = True
 
+    # REDIS
+    REDIS_URL: str = "redis://redis:6379/0"
+    REDIS_MAX_RETRIES: int = 3
+    REDIS_RETRY_DELAY: float = 1.0
+
     # Validación Calidad (OpenCV heurísticas v1)
     QUALITY_MIN_WIDTH: int = 800
     QUALITY_MIN_HEIGHT: int = 600

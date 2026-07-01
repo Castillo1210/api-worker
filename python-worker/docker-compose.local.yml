@@ -1,0 +1,107 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: confirmo
+      POSTGRES_USER: confirmo_app
+      POSTGRES_PASSWORD: confirmo_app
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U confirmo_app -d confirmo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8081
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=confirmo
+      - DATABASE_USER=confirmo_app
+      - DATABASE_PASSWORD=confirmo_app
+      - GCS_BUCKET=confirmo-vouchers-dev
+      - LLAMA_PARSER_URL=https://api.llamaparser.com
+      - LLAMA_CLOUD_API_KEY=${LLAMA_CLOUD_API_KEY}
+      - API_BRIDGE_URL=http://api-bridge:8080
+      - INTERNAL_SECRET=your_internal_secret_32_chars_min
+      - REDIS_URL=redis://host.docker.internal:6379/0
+      - CELERY_BROKER_URL=redis://host.docker.internal:6379/0
+      - CELERY_RESULT_BACKEND=redis://host.docker.internal:6379/1
+      - LOG_LEVEL=INFO
+      - METRICS_PORT=9090
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+      - "9090:9090"
+    volumes:
+      - ./models:/app/models:ro
+      - ./logs:/app/logs
+
+  worker:
+    build: .
+    command: celery -A app.worker.celery_app worker --loglevel=info --queues=deposit_processing
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=confirmo
+      - DATABASE_USER=confirmo_app
+      - DATABASE_PASSWORD=confirmo_app
+      - GCS_BUCKET=confirmo-vouchers-dev
+      - LLAMA_PARSER_URL=https://api.llamaparser.com
+      - LLAMA_CLOUD_API_KEY=${LLAMA_CLOUD_API_KEY}
+      - API_BRIDGE_URL=http://api-bridge:8080
+      - INTERNAL_SECRET=your_internal_secret_32_chars_min
+      - REDIS_URL=redis://host.docker.internal:6379/0
+      - CELERY_BROKER_URL=redis://host.docker.internal:6379/0
+      - CELERY_RESULT_BACKEND=redis://host.docker.internal:6379/1
+      - LOG_LEVEL=INFO
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./models:/app/models:ro
+      - ./logs:/app/logs
+
+  beat:
+    build: .
+    command: celery -A app.worker.celery_app beat --loglevel=info --scheduler celery.beat.PersistentScheduler
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=confirmo
+      - DATABASE_USER=confirmo_app
+      - DATABASE_PASSWORD=confirmo_app
+      - GCS_BUCKET=confirmo-vouchers-dev
+      - LLAMA_PARSER_URL=https://api.llamaparser.com
+      - LLAMA_CLOUD_API_KEY=${LLAMA_CLOUD_API_KEY}
+      - API_BRIDGE_URL=http://api-bridge:8080
+      - INTERNAL_SECRET=your_internal_secret_32_chars_min
+      - REDIS_URL=redis://host.docker.internal:6379/0
+      - CELERY_BROKER_URL=redis://host.docker.internal:6379/0
+      - CELERY_RESULT_BACKEND=redis://host.docker.internal:6379/1
+      - LOG_LEVEL=INFO
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - celery-beat-data:/app
+
+volumes:
+  postgres-data:
+  celery-beat-data:

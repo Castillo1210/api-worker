@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.api import setup_routes
 from app.api.dependencies import get_db_updater, get_storage_client
-from app.worker import celery_app
 from app.config import get_settings
 import structlog
 
@@ -14,17 +13,21 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Iniciando Confirmo Worker")
 
-    # Inicializar conexiones
-    db = await get_db_updater()
-    storage = get_storage_client()
-
-    logger.info("Dependencias inicializadas")
+    db = None
+    if settings.ENVIRONMENT != "development":
+        # Inicializar conexiones externas solo fuera del modo local.
+        db = await get_db_updater()
+        get_storage_client()
+        logger.info("Dependencias inicializadas")
+    else:
+        logger.info("Modo development: dependencias externas no inicializadas")
 
     yield
 
     # Shutdown
     logger.info("Cerrando Confirmo Worker")
-    await db.close()
+    if db is not None:
+        await db.close()
     logger.info("Confirmo Worker detenido")
 
 app = FastAPI(

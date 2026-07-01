@@ -34,7 +34,7 @@ class BusinessValidator:
         if not moneda:
             error_ids.append(await self._get_error_id("MONEDA_FALTANTE"))
         elif str(moneda).upper() not in ("PEN", "USD"):
-            error_ids.append(await self._get_error_id("MONEDA_INVALIDAD"))
+            error_ids.append(await self._get_error_id("MONEDA_INVALIDA"))
         
         # Numero operacion
         if not data.get("numero_operacion"):

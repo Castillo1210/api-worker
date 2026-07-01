@@ -12,13 +12,16 @@ class QualityResult:
 
 class ImageQualityValidator:
     def __init__(self, model_path: str = "models/document_quality.tflite"):
-        self.interpreter = tf.lite.Interpreter(model_path="model_path=model_path")
+        self.interpreter = tf.lite.Interpreter(model_path=model_path)
         self.interpreter.allocate_tensors()
         self.input_details = self.interpreter.get_input_details()
         self.output_details = self.interpreter.get_output_details()
 
     def validate(self, image_bytes: bytes) -> QualityResult:
         img = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+
+        if img is None:
+            return QualityResult(is_valid=False, issues=["INVALID_IMAGE_FORMAT"], metrics={})
 
         issues = []
         h, w = img.shape[:2]
@@ -30,7 +33,7 @@ class ImageQualityValidator:
         if blur_score < 100:
             issues.append("BLURRY")
 
-        glare_ratio = np.sum(gray > 240)
+        glare_ratio = np.sum(gray > 240) / gray.size
         if glare_ratio > 0.15:
             issues.append("GLARE_DETECTED")
 
@@ -54,3 +57,10 @@ class ImageQualityValidator:
                 "document_confidence": float(doc_condifence)
             }
         )
+
+    def _preprocess_for_model(self, img: np.ndarray) -> np.ndarray:
+        input_shape = self.input_details[0]["shape"]
+        height, width = input_shape[1], input_shape[2]
+        resized = cv2.resize(img, (width, height))
+        normalized = resized.astype(np.float32) / 255.0
+        return np.expand_dims(normalized, axis=0)

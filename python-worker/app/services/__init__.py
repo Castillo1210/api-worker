@@ -1,10 +1,3 @@
-# app/services/__init__.py
-from app.services.quality_validator import QualityValidator
-from app.services.llama_parser_client import LlamaParserClient
-from app.services.cloudsql_client import CloudSQLClient
-from app.services.storage_client import StorageClient
-from app.services.callback_client import CallbackClient
-from app.services.business_validator import BusinessValidator  # NUEVO
 from app.services.metrics import (
     quality_validations_total,
     quality_duration_seconds,
@@ -16,13 +9,36 @@ from app.services.metrics import (
     callback_notifications_total,
 )
 
+
+def __getattr__(name):
+    if name == "QualityValidator":
+        from app.services.quality_validator import QualityValidator
+        return QualityValidator
+    if name == "LlamaParserClient":
+        from app.services.llama_parser_client import LlamaParserClient
+        return LlamaParserClient
+    if name == "CloudSQLClient":
+        from app.services.cloudsql_client import CloudSQLClient
+        return CloudSQLClient
+    if name == "StorageClient":
+        from app.services.storage_client import StorageClient
+        return StorageClient
+    if name == "CallbackClient":
+        from app.services.callback_client import CallbackClient
+        return CallbackClient
+    if name == "BusinessValidator":
+        from app.services.business_validator import BusinessValidator
+        return BusinessValidator
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
     "QualityValidator",
     "LlamaParserClient",
     "CloudSQLClient",
     "StorageClient",
     "CallbackClient",
-    "BusinessValidator",  # NUEVO
+    "BusinessValidator",
     "quality_validations_total",
     "quality_duration_seconds",
     "llama_parser_calls_total",

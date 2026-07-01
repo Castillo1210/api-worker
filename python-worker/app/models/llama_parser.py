@@ -1,12 +1,14 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 
-class LLamaParserRequest(BaseModel):
+class LlamaParserRequest(BaseModel):
     file_base64: str
     file_type: str
     prompt: str
     temperature: float = 0.0
     max_tokens: int = 2000
+
+LlamaParserRequest = LlamaParserRequest
 
 class LlamaParserResponse(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0, description="Confianza global 0-1")

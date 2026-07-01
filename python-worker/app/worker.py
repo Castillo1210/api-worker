@@ -1,8 +1,9 @@
 from celery import Celery
-from app.config import get_settings
 import structlog
 
-# Configurar structlog
+from app.config import get_settings
+
+# Configure structlog
 structlog.configure(
     processors=[
         structlog.stdlib.filter_by_level,
@@ -13,7 +14,7 @@ structlog.configure(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -40,9 +41,6 @@ celery_app.conf.update(
         "app.tasks.process_deposit.process_deposit": {"queue": "deposit_processing"}
     },
     beat_schedule={},
-    # Serialización de errores
-    task_serializer="json",
-    result_serializer="json",
 )
 
 # Auto-discover tasks

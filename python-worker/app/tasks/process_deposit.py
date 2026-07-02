@@ -128,8 +128,6 @@ async def _process_deposit_async(deposit_id: str):
             "error_message": None,
         })
 
-        await _redis_queue.publish_result(payload)
-
         logger.info("Resultado publicado en Redis", deposit_id=deposit_id)
 
         return {"status": "success"}

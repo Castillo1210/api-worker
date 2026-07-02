@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from datetime import time
+import time
 from llama_cloud import LlamaCloud
 from llama_cloud.types import ExtractConfiguration, FileCreateResponse, ExtractV2Job
 from io import BytesIO

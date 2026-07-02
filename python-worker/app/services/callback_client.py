@@ -23,7 +23,7 @@ class CallbackClient:
             "warning_ids": result.get("warning_ids", []),
             "error_type": result.get("error_type"),
             "error_message": result.get("error_message"),
-            "timestamp": datetime.utcnow().isoformat
+            "timestamp": datetime.utcnow().isoformat()
         }
 
         headers = {
@@ -34,7 +34,7 @@ class CallbackClient:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(
-                    f"{self.base_url}/internal/webhooks/deposit-processed",
+                    f"{self.base_url}/internal/webhooks/worker-result",
                     json=payload,
                     headers=headers
                 )

@@ -64,11 +64,11 @@ class DepositUpdateData(BaseModel):
     numero_operacion: str
     numero_operacion_banco: Optional[str] = None
     empresa_id: Optional[uuid.UUID] = None
-    cliente: Optional[str]
-    datos_ocr: Dict[str, Any]
+    cliente: Optional[str] = None
+    datos_ocr: Dict[str, Any] = None
     estado: str
     motivo_rechazo: Optional[str] = None
-    fecha_validacion: Optional[str]
+    fecha_validacion: Optional[str] = None
     error_ids: List[UUID] = []
     warning_ids: List[UUID] = []
 

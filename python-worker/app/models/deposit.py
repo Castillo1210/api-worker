@@ -43,6 +43,8 @@ class QualityResult(BaseModel):
     metrics: Dict[str, Any]
     processed_bytes: Optional[bytes] = None
     file_type: str
+    capture_type: Optional[str] = None
+    capture_scores: Dict[str, float] = {}
 
 class ProcessDepositRequest(BaseModel):
     deposit_id: str
@@ -81,7 +83,15 @@ class QualityValidateRequest(BaseModel):
 
 class QualityValidateResponse(BaseModel):
     valid: bool
+    should_proceed: bool = False
+    next_action: str = "review"
     issues: List[str] = []
     message: Optional[str] = None
     processed_file: Optional[str] = None
     file_type: Optional[str] = None
+    capture_type: Optional[str] = None
+    capture_label: Optional[str] = None
+    capture_description: Optional[str] = None
+    capture_mode: Optional[str] = None
+    classification: Dict[str, Any] = Field(default_factory=dict)
+    validation_details: Dict[str, Any] = Field(default_factory=dict)

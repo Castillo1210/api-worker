@@ -1,5 +1,7 @@
-﻿# app/tasks/process_deposit.py
 import asyncio
+import time
+
+import structlog
 from celery import shared_task
 from uuid import UUID
 from datetime import datetime, time, date
@@ -34,6 +36,7 @@ def _init_services():
         _llama = LlamaParserClient(SchemaRegistry(), _db)
         _redis_queue = RedisQueueClient()
 
+
 @shared_task(
     bind=True,
     max_retries=3,
@@ -42,12 +45,12 @@ def _init_services():
     retry_backoff_max=300,
     retry_jitter=True,
     acks_late=True,
-    reject_on_worker_lost=True
+    reject_on_worker_lost=True,
 )
-
 def process_deposit(self, deposit_id: str):
-    """"
-    Task principal: Consumido de Redis Queue, procesa depósito completo.
+    """
+    Procesa el depósito hasta obtener la extracción de LlamaCloud
+    y publica el resultado en Redis para que otro consumidor continúe.
     """
     _init_services()
 
@@ -61,7 +64,7 @@ def process_deposit(self, deposit_id: str):
         deposit_processing_total.labels(status=result["status"]).inc()
 
         return result
-    except Exception as e:
+    except Exception:
         duration = time.time() - start_time
         deposit_processing_duration_seconds.observe(duration)
         deposit_processing_total.labels(status="error").inc()
@@ -73,9 +76,8 @@ async def _process_deposit_async(deposit_id: str):
 
     # 1. Conectar BD
     await _db.connect()
-    
+
     try:
-        # 2. Obtener depósito de BD
         deposit = await _db.get_deposit_for_processing(deposit_id)
         if not deposit or not deposit.get("imagen_voucher"):
             return {"status": "error", "error_type": "no_image"}
@@ -86,7 +88,7 @@ async def _process_deposit_async(deposit_id: str):
         file_bytes = _storage.download_voucher(deposit.imagen_voucher)
         content_type = _storage.get_content_type(deposit.imagen_voucher)
         file_type = "pdf" if "pdf" in content_type else "image"
-        
+
         logger.info("Archivo descargado", deposit_id=deposit_id, file_type=file_type, size=len(file_bytes))
 
         try:
@@ -123,8 +125,10 @@ async def _process_deposit_async(deposit_id: str):
             "deposit_id": deposit_id,
             "status": "success",
             "error_type": None,
-            "error_message": None
+            "error_message": None,
         })
+
+        await _redis_queue.publish_result(payload)
 
         logger.info("Resultado publicado en Redis", deposit_id=deposit_id)
 

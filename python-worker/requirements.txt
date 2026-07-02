@@ -16,3 +16,4 @@ structlog==24.1.0
 prometheus-client==0.19.0
 alembic==1.13.1
 tenacity==8.2.3
+llama-cloud==2.9.1

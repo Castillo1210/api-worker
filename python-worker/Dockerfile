@@ -3,11 +3,12 @@ FROM python:3.11-slim
 
 # System deps: OpenCV + pdf2image (poppler) + tesseract opcional
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender-dev \
-    libgl1-mesa-glx \
+    libgl1 \
     libgomp1 \
     poppler-utils \
     tesseract-ocr \
@@ -41,8 +42,5 @@ EXPOSE 8081 9090
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:8081/health || exit 1
 
-# Entrypoint script para lanzar FastAPI + Celery
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
-ENTRYPOINT ["docker-entrypoint.sh"]
+# FastAPI por defecto; Celery se sobreescribe desde docker-compose
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8081"]

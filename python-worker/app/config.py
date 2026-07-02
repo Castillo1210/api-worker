@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, List
 import json
 
 class Settings(BaseSettings):
@@ -21,9 +21,10 @@ class Settings(BaseSettings):
     GCS_BUCKET: str = "confirmo-vouchers"
     GCS_CREDENTIALS_PATH: Optional[str] = None
 
-    # IA LlamaParse
+    # IA LlamaParse / LlamaCloud
     LLAMA_PARSER_URL: str
-    LLAMA_PARSER_API_KEY: str
+    LLAMA_CLOUD_API_KEY: str = ""
+    LLAMA_PARSER_API_KEY: str = ""
     LLAMA_PARSER_TIMEOUT: float = 30.0
     LLAMA_PARSER_MAX_RETRIES: int = 3
     LLAMA_PARSER_RETRY_BACKOFF: float = 2.0
@@ -33,8 +34,8 @@ class Settings(BaseSettings):
     INTERNAL_SECRET: str
 
     # Sistema financiero (Webhook)
-    FINANCE_WEBHOOK_URL: str
-    FINANCE_WEBHOOK_SECRET: str
+    FINANCE_WEBHOOK_URL: str = ""
+    FINANCE_WEBHOOK_SECRET: str = ""
     FINANCE_WEBHOOK_TIMEOUT: float = 10.0
 
     # Firebase (FCM)
@@ -45,7 +46,7 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str = "redis://redis:6379/1"
     CELERY_TASK_SERIALIZER: str = "json"
     CELERY_RESULT_SERIALIZER: str = "json"
-    CELERY_ACCEPT_CONTENT: str = ["json"]
+    CELERY_ACCEPT_CONTENT: List[str] = ["json"]
     CELERY_TIMEZONE: str = "UTC"
     CELERY_WORKER_CONCURRENCY: int = 2
     CELERY_WORKER_PREFETCH_MULTIPLIER: int = 1
@@ -53,17 +54,21 @@ class Settings(BaseSettings):
     CELERY_TASK_REJECT_ON_WORKER_LOST: bool = True
 
     # REDIS
-    REDIS_URL: str = "redis://redis:6379/0"
+    REDIS_URL: str = "redis://localhost:6379/0"
     REDIS_MAX_RETRIES: int = 3
     REDIS_RETRY_DELAY: float = 1.0
 
     # Validación Calidad (OpenCV heurísticas v1)
     QUALITY_MIN_WIDTH: int = 800
     QUALITY_MIN_HEIGHT: int = 600
-    QUALITY_MIN_BLUR_SCORE: float = 100.0
+    QUALITY_MIN_SCREENSHOT_WIDTH: int = 360
+    QUALITY_MIN_SCREENSHOT_HEIGHT: int = 600
+    QUALITY_MIN_BLUR_SCORE: float = 25.0
+    QUALITY_MIN_SCREENSHOT_BLUR_SCORE: float = 35.0
+    QUALITY_MIN_SCREEN_PHOTO_BLUR_SCORE: float = 25.0
     QUALITY_MAX_GLARE_RATIO: float = 0.15
-    QUALITY_MIN_CONTRAST: float = 30.0
-    QUALITY_MIN_DOC_CONFIDENCE: float = 0.7
+    QUALITY_MIN_CONTRAST: float = 18.0
+    QUALITY_MIN_DOC_CONFIDENCE: float = 0.3
     QUALITY_PDF_DPI: int = 200
 
     # Prompts

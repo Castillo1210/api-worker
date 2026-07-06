@@ -3,11 +3,19 @@ from pydantic import BaseModel
 import time
 from typing import Optional, Dict, Any, Type
 from app.config import get_settings
+import builtins
 from app.services.schema_registry import SchemaRegistry
 from app.services.cloudsql_client import CloudSQLClient
 from app.utils.schema_builder import build_pydantic_model, build_response_model
 import structlog
 from pydantic import BaseModel
+
+if not hasattr(builtins, 'MetadataFilters'):
+    class MetadataFilters(BaseModel):
+        pass
+    builtins.MetadataFilters = MetadataFilters
+# ==============================================
+
 from llama_cloud import AsyncLlamaCloud
 
 from app.config import get_settings

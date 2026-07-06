@@ -39,9 +39,16 @@ class CloudSQLClient:
         
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow("""
-                SELECT d.*
+                SELECT 
+                    d."Id" as id,
+                    d."ImagenVoucher" as imagen_voucher,
+                    d."Monto" as monto,
+                    d."Moneda" as moneda,
+                    d."FechaDeposito" as fecha_deposito,
+                    d."NumeroOperacion" as numero_operacion,
+                    d."Estado" as estado
                 FROM depositos d
-                WHERE d.id = $1
+                WHERE d."Id" = $1
             """, deposit_id)
 
             if row:
@@ -56,9 +63,8 @@ class CloudSQLClient:
         async with self.pool.acquire() as conn:
             # Buscar por nombre o razon_social
             row = await conn.fetchrow("""
-                SELECT id FROM empresa
-                WHERE nombre ILIKE $1
-                    OR razon_social ILIKE $1
+                SELECT id FROM empresas
+                WHERE "Nombre" ILIKE $1
                 LIMIT 1""", f"%{beneficiario}%")
             
             if row:
@@ -76,12 +82,12 @@ class CloudSQLClient:
         async with self.pool.acquire() as conn:
             if exclude_id:
                 count = await conn.fetchval(
-                    "SELECT COUNT(*) FROM depositos WHERE numero_operacion = $1 AND id != $2",
+                    """SELECT COUNT(*) FROM depositos WHERE "NumeroOperacion" = $1 AND "Id" != $2""",
                     numero_operacion, exclude_id
                 )
             else:
                 count = await conn.fetchval(
-                    "SELECT COUNT(*) FROM depositos WHERE numero_operacion = $1",
+                    """SELECT COUNT(*) FROM depositos WHERE "NumeroOperacion" = $1""",
                     numero_operacion
                 )
             return count > 0
@@ -128,12 +134,12 @@ class CloudSQLClient:
         async with self.pool.acquire() as conn:
             if motivo_rechazo:
                 await conn.execute(
-                    "UPDATE depositos SET estado = $1, motivo_rechazo = $2 WHERE id = $3",
+                    """UPDATE depositos SET "Estado" = $1, "MotivoRechazo" = $2 WHERE "Id" = $3""",
                     estado, motivo_rechazo, deposit_id
                 )
             else:
                 await conn.execute(
-                    "UPDATE depositos SET estado = $1 WHERE id = $2", 
+                    """UPDATE depositos SET "Estado" = $1 WHERE "Id" = $2""", 
                     estado, deposit_id
                 )
             

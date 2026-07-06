@@ -52,7 +52,7 @@ class CloudSQLClient:
             """, deposit_id)
 
             if row:
-                return DepositRow(**dict(row))
+                return dict(row)
             return None
         
     async def lookup_empresa_id(self, beneficiario: str) -> Optional[UUID]:

@@ -131,8 +131,7 @@ class SchemaRegistry:
         await self.db.connect()
         async with self.db.pool.acquire() as conn:
             rows = await conn.fetch("""
-                SELECT field_name, field_type, description, is_required, 
-                    default_value, field_order, is_computed, compute_expression
+                SELECT field_name, field_type, description, is_required, field_order
                 FROM voucher_schema_fields
                 WHERE is_active = true
                 ORDER BY field_order

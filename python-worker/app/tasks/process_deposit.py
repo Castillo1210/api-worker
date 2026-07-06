@@ -85,7 +85,7 @@ async def _process_deposit_async(deposit_id: str):
         imagen_voucher = deposit.get("imagen_voucher")
         file_bytes = _storage.download_voucher(imagen_voucher)
         content_type = _storage.get_content_type(imagen_voucher)
-        file_type = "pdf" if "pdf" in content_type else "image"
+        file_type = content_type.split("/")[-1] if "/" in content_type else "jpeg"
 
         logger.info("Archivo descargado", deposit_id=deposit_id, file_type=file_type, size=len(file_bytes))
 

@@ -61,7 +61,7 @@ class LlamaParserClient:
         schema_class, response_class = await self._get_or_build_models()
 
         filename = f"voucher.{file_type}"
-        media_type = "application/pdf" if file_type == "pdf" else "image/jpeg"
+        media_type = "application/pdf" if file_type == "pdf" else f"image/{file_type}"
         client = self._get_client()
 
         last_error = None

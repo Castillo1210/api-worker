@@ -107,13 +107,9 @@ class SchemaRegistry:
     async def _compute_schema_hash(self) -> str:
         """Hash SHA256 de todos los componentes del schema"""
         fields = await self._load_schema_fields()
-        rules = await self._load_business_rules()
-        computed = await self._load_computed_fields()
         
         content = json.dumps({
-            "fields": fields,
-            "rules": rules,
-            "computed": computed
+            "fields": fields
         }, sort_keys=True, default=str)
         return hashlib.sha256(content.encode()).hexdigest()[:16]
     
@@ -144,60 +140,10 @@ class SchemaRegistry:
         return fields
     
     async def _load_business_rules(self) -> List[Dict]:
-        key = "schema:business_rules"
-        if self.redis:
-            cached = await self.redis.get(key)
-            if cached:
-                return json.loads(cached)
-        if key in self._local_cache:
-            return self._local_cache[key]
-        
-        await self.db.connect()
-        async with self.db.pool.acquire() as conn:
-            rows = await conn.fetch("""
-                SELECT rule_name, condition_expression, error_message, severity
-                FROM voucher_business_rules
-                WHERE is_active = true
-            """)
-        rules = [dict(r) for r in rows]
-        if self.redis:
-            await self.redis.setex(key, self._cache_ttl, json.dumps(rules, default=str))
-        self._local_cache[key] = rules
-        return rules
+        return []
     
     async def _load_computed_fields(self) -> Dict[str, Callable]:
-        key = "schema:computed_fields"
-        if self.redis:
-            cached = await self.redis.get(key)
-            if cached:
-                # Deserializar lambdas (simple eval - solo trusted)
-                return {k: eval(v) for k, v in json.loads(cached).items()}
-        if key in self._local_cache:
-            return self._local_cache[key]
-        
-        await self.db.connect()
-        async with self.db.pool.acquire() as conn:
-            rows = await conn.fetch("""
-                SELECT field_name, depends_on, compute_expression, field_type
-                FROM voucher_computed_fields
-                WHERE is_active = true
-            """)
-        
-        computed = {}
-        for row in rows:
-            # Crear función lambda segura
-            expr = row["compute_expression"]
-            deps = [d.strip() for d in row["depends_on"].split(",")]
-            # Compilar lambda: lambda monto, moneda: expr
-            fn = eval(f"lambda {', '.join(deps)}: {expr}")  # Solo trusted internal
-            computed[row["field_name"]] = fn
-        
-        if self.redis:
-            # Serializar lambdas como strings
-            serializable = {k: v.__code__.co_code.hex() for k, v in computed.items()}
-            await self.redis.setex(key, self._cache_ttl, json.dumps(serializable))
-        self._local_cache[key] = computed
-        return computed
+        return []
     
     def _build_pydantic_model(self, name: str, fields: List[Dict]) -> Type[BaseModel]:
         """Crea modelo Pydantic dinámico desde campos BD"""

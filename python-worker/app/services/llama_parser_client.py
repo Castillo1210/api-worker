@@ -8,6 +8,7 @@ from app.services.cloudsql_client import CloudSQLClient
 from app.utils.schema_builder import build_pydantic_model, build_response_model
 import structlog
 from pydantic import BaseModel
+from llama_cloud import AsyncLlamaCloud
 
 from app.config import get_settings
 from app.services.cloudsql_client import CloudSQLClient
@@ -44,7 +45,6 @@ class LlamaParserClient:
 
     def _get_client(self):
         if self._client is None:
-            from llama_cloud import AsyncLlamaCloud
 
             self._client = AsyncLlamaCloud(api_key=self.api_key)
         return self._client

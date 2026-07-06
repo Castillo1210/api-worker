@@ -49,7 +49,7 @@ def build_response_model(base_model: Type[BaseModel], name: str = "LlamaParserRe
     return create_model(
         name,
         __base__=base_model,
-        confidence=(Optional[float], Field(ge=0.0, le=1.0, description="Confianza global 0-1")),
+        confidence=(Optional[float], Field(default=None,ge=0.0, le=1.0)),
         field_confidences=(Dict[str, float], Field(default_factory=dict, description="Confianza por campo")),
         raw_response=(Optional[Dict[str, Any]], Field(default=None, description="Respuesta cruda de LlamaCloud")),
     )

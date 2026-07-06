@@ -11,6 +11,6 @@ class LlamaParserRequest(BaseModel):
 LlamaParserRequest = LlamaParserRequest
 
 class LlamaParserResponse(BaseModel):
-    confidence: float = Field(ge=0.0, le=1.0, description="Confianza global 0-1")
+    confidence: Optional[float] = Field(ge=0.0, le=1.0, description="Confianza global 0-1")
     field_confidence: Dict[str, float] = Field(default_factory=dict, description="Confianza por campo")
     raw_response: Optional[Dict[str, Any]] = Field(default=None, description="Respuesta cruda")

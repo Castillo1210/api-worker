@@ -81,7 +81,7 @@ class SchemaRegistry:
         base = await self.get_voucher_schema()
         # Añadir campos de respuesta
         extra_fields = {
-            "confidence": (float, Field(ge=0.0, le=1.0, description="Confianza global")),
+            "confidence": (Optional[float], Field(default=None, ge=0.0, le=1.0, description="Confianza global")),
             "field_confidences": (Dict[str, float], Field(default_factory=dict, description="Confianza por campo")),
             "raw_response": (Optional[Dict[str, Any]], Field(default=None, description="Respuesta cruda"))
         }

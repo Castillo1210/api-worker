@@ -97,32 +97,34 @@ class CloudSQLClient:
         if not self.pool:
             raise RuntimeError("Pool no inicializado")
         
+        field_map = {
+            "Monto": data.monto,
+            "Moneda": data.moneda,
+            "FechaDeposito": data.fecha_deposito,
+            "NumeroOperacion": data.numero_operacion,
+            "Estado": data.estado,
+        }
+        
         fields = []
         values = [deposit_id]
         param_idx = 2
 
-        field_map = {
-            "monto": data.monto,
-            "moneda": data.moneda,
-            "fecha_deposito": data.fecha_deposito,
-            "numero_operacion": data.numero_operacion,
-            "empresa_id": data.empresa_id,
-            "cliente": data.cliente,
-            "datos_ocr": data.datos_ocr,
-            "estado": data.estado,
-        }
-
         for field, value in field_map.items():
-            fields.append(f"{field} = ${param_idx}")
-            values.append(value)
-            param_idx += 1
+            if value is not None:
+                fields.append(f"{field} = ${param_idx}")
+                values.append(value)
+                param_idx += 1
+        
+        if not fields:
+            return False
 
-        query = f"UPDATE depositos SET {', '.join(fields)} WHERE id = $1"
+        query = f'UPDATE depositos SET {', '.join(fields)} WHERE "Id" = $1'
 
         async with self.pool.acquire() as conn:
             result = await conn.execute(query, *values)
+            success = result.startswith("UPDATE")
             logger.info("Depósito actualizado", deposit_id=deposit_id, estado=data.estado, result=result)
-            return result == "UPDATE 1"
+            return success
 
         logger.info("Depósito actualizado", deposit_id=deposit_id, estado=estado)
 

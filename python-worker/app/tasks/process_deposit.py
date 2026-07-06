@@ -107,7 +107,7 @@ async def _process_deposit_async(deposit_id: str):
         update_data = DepositUpdateData(
             monto=llama_data.monto,
             moneda=llama_data.moneda or "PEN",
-            fecha_deposito=llama_data.fecha_operacion,
+            fecha_deposito=llama_data.fecha_deposito,
             numero_operacion=llama_data.numero_operacion or "",
             estado="procesado" # <- SIEMPRE procesado
         )

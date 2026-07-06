@@ -19,7 +19,7 @@ class RedisQueueClient:
 
     async def connect(self):
         """Inicializa conexión y consumer group"""
-        self.redis = redis.from_url(self.redis_url, decode_response=True)
+        self.redis = redis.from_url(self.redis_url, decode_responses=True)
 
         # Crear consumer groups si no existen
         for stream in [self.process_queue, self.result_queue]:

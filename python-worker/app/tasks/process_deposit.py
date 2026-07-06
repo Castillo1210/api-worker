@@ -84,7 +84,7 @@ async def _process_deposit_async(deposit_id: str):
         # 4. Descargar archivo de GCS
         imagen_voucher = deposit.get("imagen_voucher")
         file_bytes = _storage.download_voucher(imagen_voucher)
-        content_type = _storage.get_content_type(deposit.imagen_voucher)
+        content_type = _storage.get_content_type(imagen_voucher)
         file_type = "pdf" if "pdf" in content_type else "image"
 
         logger.info("Archivo descargado", deposit_id=deposit_id, file_type=file_type, size=len(file_bytes))

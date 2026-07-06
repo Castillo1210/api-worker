@@ -13,26 +13,33 @@ settings = get_settings()
 
 async def consume_redis_loop():
     """Consume deposit from Redis Stream and dispatch to Celery"""
-    client = RedisQueueClient(redis_url=settings.REDIS_URL)
-    await client.connect()
-    logger.info("Redis Stream consumer iniciado", queue="deposit:process:queue")
+    try:
+        print(">>> [CONSUMER] Iniciando el loop de consumo de Redis...", flush=True)
+        client = RedisQueueClient(redis_url=settings.REDIS_URL)
 
-    while True:
-        try:
-            messages = await client.consume_process(count=5, block_ms=5000)
-            for msg in messages:
-                deposit_id = msg.get("deposit_id") or msg.get("data")
-                if deposit_id:
-                    if isinstance(deposit_id, str) and deposit_id.startswith("{"):
-                        import json
-                        data = json.loads(deposit_id)
-                        deposit_id = data.get("deposit_id")
+        print(f">>> [CONSUMER] Intentando conectar a {settings.REDIS_URL}...", flush=True)
+        await client.connect()
+        print(">>> [CONSUMER] Conexión exitosa. Esperando mensajes...", flush=True)
+
+        while True:
+            try:
+                messages = await client.consume_process(count=5, block_ms=5000)
+                for msg in messages:
+                    deposit_id = msg.get("deposit_id") or msg.get("data")
                     if deposit_id:
-                        process_deposit.delay(str(deposit_id))
-                        await client.ack_process([msg.get("_msg_id")])
-        except Exception as e:
-            logger.error("Error en consumer loop", error=str(e))
-            await asyncio.sleep(5)
+                        if isinstance(deposit_id, str) and deposit_id.startswith("{"):
+                            import json
+                            data = json.loads(deposit_id)
+                            deposit_id = data.get("deposit_id")
+                        if deposit_id:
+                            print(f">>> [CONSUMER] ¡Mensaje recibido! Encolando a Celery...", flush=True)
+                            process_deposit.delay(str(deposit_id))
+                            await client.ack_process([msg.get("_msg_id")])
+            except Exception as e:
+                print(f">>> [CONSUMER] Error dentro del loop: {str(e)}", flush=True)
+                await asyncio.sleep(5)
+    except Exception as e:
+        print(f">>> [CONSUMER] ERROR FATAL, EL CONSUMIDOR MURIÓ: {str(e)}", flush=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

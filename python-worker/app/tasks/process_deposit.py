@@ -4,7 +4,6 @@ import time
 import structlog
 from celery import shared_task
 from uuid import UUID
-from datetime import datetime, time, date
 from app.config import get_settings
 from app.models.deposit import DepositRow, DepositUpdateData, ValidationResult
 from app.services.cloudsql_client import CloudSQLClient
@@ -12,12 +11,10 @@ from app.services.storage_client import StorageClient
 from app.services.llama_parser_client import LlamaParserClient, LlamaParserError
 from app.utils.redis_queue_client import RedisQueueClient
 from app.services.schema_registry import SchemaRegistry
-from uuid import UUID
 from app.services.metrics import (
     deposit_processing_total,
     deposit_processing_duration_seconds,
 )
-import structlog
 
 logger = structlog.get_logger()
 

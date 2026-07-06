@@ -118,7 +118,7 @@ class CloudSQLClient:
         if not fields:
             return False
 
-        query = f'UPDATE depositos SET {', '.join(fields)} WHERE "Id" = $1'
+        query = f"UPDATE depositos SET {', '.join(fields)} WHERE \"Id\" = $1"
 
         async with self.pool.acquire() as conn:
             result = await conn.execute(query, *values)

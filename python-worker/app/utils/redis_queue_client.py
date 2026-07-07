@@ -84,7 +84,15 @@ class RedisQueueClient:
         if not self.redis:
             await self.connect()
         message["processed_at"] = datetime.utcnow().isoformat()
-        await self.redis.xadd(self.result_queue, message)
+        clean_message = {
+            key: (value if value is not None else "")
+            for key, value in message.items()
+        }
+
+        if "deposit_id" in clean_message:
+            clean_message["deposit_id"] = str(clean_message["deposit_id"])
+
+        await self.redis.xadd(self.result_queue, clean_message)
         logger.info("Resultado publicado", deposit_id=message.get("deposit_id"), status=message.get("status"))
 
     # ==== DLQ ====

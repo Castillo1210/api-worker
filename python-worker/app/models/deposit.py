@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import date
 from decimal import Decimal
@@ -60,9 +60,9 @@ class LlamaParserResponse(BaseModel):
     field_confidence: Dict[str, float] = {}
 
 class DepositUpdateData(BaseModel):
-    monto: float
+    monto: Decimal
     moneda: str
-    fecha_deposito: str
+    fecha_deposito: Optional[date] = None
     numero_operacion: str
     numero_operacion_banco: Optional[str] = None
     empresa_id: Optional[uuid.UUID] = None
@@ -73,6 +73,21 @@ class DepositUpdateData(BaseModel):
     fecha_validacion: Optional[str] = None
     error_ids: List[UUID] = []
     warning_ids: List[UUID] = []
+
+    @field_validator('fecha_deposito', mode='before')
+    @classmethod
+    def parse_fecha_ia(cls, value, info):
+        if not value:
+            return None
+        
+        if isinstance(value, date):
+            return value
+        
+        try:
+            return date.fromisoformat(str(value)[:10])
+        except (ValueError, TypeError):
+            return None
+
 
 class ValidationResult(BaseModel):
     is_valid: bool

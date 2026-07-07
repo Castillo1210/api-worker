@@ -92,7 +92,7 @@ class RedisQueueClient:
         if "deposit_id" in clean_message:
             clean_message["deposit_id"] = str(clean_message["deposit_id"])
 
-        await self.redis.xadd(self.result_queue, clean_message)
+        await self.redis.xadd(self.result_queue, {"data": json.dumps(clean_message)})
         logger.info("Resultado publicado", deposit_id=message.get("deposit_id"), status=message.get("status"))
 
     # ==== DLQ ====

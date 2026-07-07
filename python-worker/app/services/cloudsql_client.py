@@ -111,14 +111,14 @@ class CloudSQLClient:
 
         for field, value in field_map.items():
             if value is not None:
-                fields.append(f"{field} = ${param_idx}")
+                fields.append(f'"{field}" = ${param_idx}')
                 values.append(value)
                 param_idx += 1
         
         if not fields:
             return False
 
-        query = f"UPDATE depositos SET {', '.join(fields)} WHERE \"Id\" = $1"
+        query = f'UPDATE depositos SET {", ".join(fields)} WHERE "Id" = $1'
 
         async with self.pool.acquire() as conn:
             result = await conn.execute(query, *values)

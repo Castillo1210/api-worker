@@ -104,7 +104,7 @@ class LlamaParserClient:
                 if data is None:
                     raise LlamaParserError("LlamaCloud no devolvió extract_result", error_code="IA_NO_RESULT")
 
-                logger.info("LlamaCloud extracción exitosa", fields=list(data.keys()) if isinstance(data, dict) else None)
+                logger.info("LlamaCloud extracción exitosa", fields=list(data.keys()) if isinstance(data, dict) else None, raw_data=data)
                 return response_class.model_validate(data)
             except LlamaParserError:
                 raise

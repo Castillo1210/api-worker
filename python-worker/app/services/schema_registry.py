@@ -24,11 +24,11 @@ class SchemaRegistry:
         self._cache_ttl = 300  # 5 min
         
         # Modelos cacheados
-        self._voucher_schema: Optional[Type[BaseModel]] = None
-        self._response_schema: Optional[Type[BaseModel]] = None
+        self._voucher_schemas: Dict[str, Type[BaseModel]] = {}
+        self._response_schemas: Dict[str, Type[BaseModel]] = {}
         self._business_rules: List[Dict] = []
         self._computed_fns: Dict[str, Callable] = {}
-        self._schema_hash: str = ""
+        self._schema_hashes: Dict[str, str] = {}
     
     async def initialize(self):
         """Inicializar conexiones"""
@@ -52,41 +52,43 @@ class SchemaRegistry:
                 self._invalidate_local_cache()
     
     def _invalidate_local_cache(self):
-        self._voucher_schema = None
-        self._response_schema = None
+        self._voucher_schemas = {}
+        self._response_schemas = {}
         self._business_rules = []
         self._computed_fns = {}
-        self._schema_hash = ""
+        self._schema_hashes = {}
         self._local_cache.clear()
     
-    async def get_voucher_schema(self) -> Type[BaseModel]:
-        """Retorna modelo Pydantic para request a LlamaCloud"""
-        current_hash = await self._compute_schema_hash()
+    async def get_voucher_schema(self, banco_id: str) -> Type[BaseModel]:
+        """Retorna modelo Pydantic para request a LlamaCloud, especifico del banco"""
+        current_hash = await self._compute_schema_hash(banco_id)
         
-        if self._voucher_schema and current_hash == self._schema_hash:
-            return self._voucher_schema
+        if self._voucher_schemas.get(banco_id) and current_hash == self._schema_hashes.get(banco_id):
+            return self._voucher_schemas[banco_id]
         
         # Cache miss o schema cambió
-        fields = await self._load_schema_fields()
-        self._voucher_schema = self._build_pydantic_model("VoucherSchema", fields)
-        self._schema_hash = current_hash
-        await self._cache_schema(current_hash, self._voucher_schema)
-        return self._voucher_schema
+        fields = await self._load_schema_fields(banco_id)
+        model = self._build_pydantic_model(f"VoucherSchema_{banco_id}", fields)
+        self._voucher_schemas[banco_id] = model
+        self._schema_hashes[banco_id] = current_hash
+        await self._cache_schema(current_hash, model)
+        return model
     
-    async def get_response_schema(self) -> Type[BaseModel]:
+    async def get_response_schema(self, banco_id: str) -> Type[BaseModel]:
         """Modelo para respuesta de LlamaCloud (incluye confidence, etc.)"""
-        if self._response_schema and self._schema_hash:
-            return self._response_schema
+        if self._response_schemas.get(banco_id) and self._schema_hashes.get(banco_id):
+            return self._response_schemas[banco_id]
         
-        base = await self.get_voucher_schema()
+        base = await self.get_voucher_schema(banco_id)
         # Añadir campos de respuesta
         extra_fields = {
             "confidence": (Optional[float], Field(default=None, ge=0.0, le=1.0, description="Confianza global")),
             "field_confidences": (Dict[str, float], Field(default_factory=dict, description="Confianza por campo")),
             "raw_response": (Optional[Dict[str, Any]], Field(default=None, description="Respuesta cruda"))
         }
-        self._response_schema = create_model("LlamaParserResponse", __base__=base, **extra_fields)
-        return self._response_schema
+        model = create_model(f"LlamaParserResponse_{banco_id}", __base__=base, **extra_fields)
+        self._response_schemas[banco_id] = model
+        return model
     
     async def get_business_rules(self) -> List[Dict]:
         if self._business_rules:
@@ -104,17 +106,18 @@ class SchemaRegistry:
         self._computed_fns = computed
         return computed
     
-    async def _compute_schema_hash(self) -> str:
-        """Hash SHA256 de todos los componentes del schema"""
-        fields = await self._load_schema_fields()
+    async def _compute_schema_hash(self, banco_id: str) -> str:
+        """Hash SHA256 de todos los componentes del schema, por banco"""
+        fields = await self._load_schema_fields(banco_id)
         
         content = json.dumps({
             "fields": fields
         }, sort_keys=True, default=str)
         return hashlib.sha256(content.encode()).hexdigest()[:16]
     
-    async def _load_schema_fields(self) -> List[Dict]:
-        key = "schema:voucher_fields"
+    async def _load_schema_fields(self, banco_id: str) -> List[Dict]:
+        key = f"schema:voucher_fields:{banco_id}"
+
         # 1. Redis
         if self.redis:
             cached = await self.redis.get(key)
@@ -129,9 +132,10 @@ class SchemaRegistry:
             rows = await conn.fetch("""
                 SELECT field_name, field_type, description, is_required, field_order
                 FROM voucher_schema_fields
-                WHERE is_active = true
+                WHERE is_active = true AND banco_id = $1
                 ORDER BY field_order
-            """)
+            """, banco_id)
+
         fields = [dict(r) for r in rows]
         # Cache
         if self.redis:

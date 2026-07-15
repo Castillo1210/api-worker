@@ -11,6 +11,7 @@ from app.services.storage_client import StorageClient
 from app.services.llama_parser_client import LlamaParserClient, LlamaParserError
 from app.utils.redis_queue_client import RedisQueueClient
 from app.services.schema_registry import SchemaRegistry
+from app.services.numero_operacion_rules import normalize_numero_operacion
 from app.services.metrics import (
     deposit_processing_total,
     deposit_processing_duration_seconds,
@@ -44,7 +45,7 @@ def _init_services():
     acks_late=True,
     reject_on_worker_lost=True,
 )
-def process_deposit(self, deposit_id: str):
+def process_deposit(self, deposit_id: str, banco_id: str):
     """
     Procesa el depósito hasta obtener la extracción de LlamaCloud
     y publica el resultado en Redis para que otro consumidor continúe.
@@ -54,7 +55,7 @@ def process_deposit(self, deposit_id: str):
     start_time = time.time()
 
     try:
-        result = asyncio.run(_process_deposit_async(deposit_id))
+        result = asyncio.run(_process_deposit_async(deposit_id, banco_id))
 
         duration = time.time() - start_time
         deposit_processing_duration_seconds.observe(duration)
@@ -67,7 +68,7 @@ def process_deposit(self, deposit_id: str):
         deposit_processing_total.labels(status="error").inc()
         raise
 
-async def _process_deposit_async(deposit_id: str):
+async def _process_deposit_async(deposit_id: str, banco_id: str):
     """Extrae campos con IA, actualiza BD, publica en Redis.
     No decide estados de negocio. Siempre pone 'procesado' cualquiera fuera el resultado."""
 
@@ -91,7 +92,7 @@ async def _process_deposit_async(deposit_id: str):
 
         try:
             # Extraer con schema dinámico (sin prompt)
-            llama_data = await _llama.extract(file_bytes, file_type)
+            llama_data = await _llama.extract(file_bytes, file_type, banco_id=banco_id)
         except LlamaParserError as e:
             # IA falló -> actualizar estado a "procesado" y publicar error
             await _db.update_deposit_status_only(deposit_id, "procesado")
@@ -103,12 +104,14 @@ async def _process_deposit_async(deposit_id: str):
             })
             return {"status": "error_ia"}
         
+        numero_operacion = normalize_numero_operacion(banco_id, llama_data.numero_operacion or "")
+        
         # 10. Preparar datos para actualización
         update_data = DepositUpdateData(
             monto=llama_data.monto,
             moneda=llama_data.moneda or "PEN",
             fecha_deposito=llama_data.fecha_deposito,
-            numero_operacion=llama_data.numero_operacion or "",
+            numero_operacion=numero_operacion,
             estado="procesado" # <- SIEMPRE procesado
         )
         

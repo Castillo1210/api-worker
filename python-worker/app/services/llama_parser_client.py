@@ -57,8 +57,8 @@ class LlamaParserClient:
             self._client = AsyncLlamaCloud(api_key=self.api_key)
         return self._client
 
-    async def extract(self, file_bytes: bytes, file_type: str) -> BaseModel:
-        schema_class, response_class = await self._get_or_build_models()
+    async def extract(self, file_bytes: bytes, file_type: str, banco_id: str) -> BaseModel:
+        schema_class, response_class = await self._get_or_build_models(banco_id)
 
         filename = f"voucher.{file_type}"
         media_type = "application/pdf" if file_type == "pdf" else f"image/{file_type}"
@@ -120,10 +120,10 @@ class LlamaParserClient:
             original_error=last_error,
         )
 
-    async def _get_or_build_models(self) -> tuple[Type[BaseModel], Type[BaseModel]]:
+    async def _get_or_build_models(self, banco_id: str) -> tuple[Type[BaseModel], Type[BaseModel]]:
         if self.schema_registry is not None:
-            schema_class = await self.schema_registry.get_voucher_schema()
-            response_class = await self.schema_registry.get_response_schema()
+            schema_class = await self.schema_registry.get_voucher_schema(banco_id)
+            response_class = await self.schema_registry.get_response_schema(banco_id)
             return schema_class, response_class
 
         if self.db is None:

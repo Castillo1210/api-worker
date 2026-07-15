@@ -26,14 +26,16 @@ async def consume_redis_loop():
                 messages = await client.consume_process(count=5, block_ms=5000)
                 for msg in messages:
                     deposit_id = msg.get("deposit_id") or msg.get("data")
+                    banco_id = msg.get("banco_id")
                     if deposit_id:
                         if isinstance(deposit_id, str) and deposit_id.startswith("{"):
                             import json
                             data = json.loads(deposit_id)
                             deposit_id = data.get("deposit_id")
+                            banco_id = data.get("banco_id") or banco_id
                         if deposit_id:
                             print(f">>> [CONSUMER] ¡Mensaje recibido! Encolando a Celery...", flush=True)
-                            process_deposit.delay(str(deposit_id))
+                            process_deposit.delay(str(deposit_id), banco_id)
                             await client.ack_process([msg.get("_msg_id")])
             except Exception as e:
                 print(f">>> [CONSUMER] Error dentro del loop: {str(e)}", flush=True)

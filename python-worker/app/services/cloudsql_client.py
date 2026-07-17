@@ -15,6 +15,8 @@ class CloudSQLClient:
         self.pool: Optional[asyncpg.Pool] = None
 
     async def connect(self):
+        if self.pool is not None:
+            return
         self.pool = await asyncpg.create_pool(
             host=self.settings.DATABASE_HOST,
             port=self.settings.DATABASE_PORT,
@@ -30,6 +32,7 @@ class CloudSQLClient:
     async def close(self):
         if self.pool:
             await self.pool.close()
+            self.pool = None
             logger.info("CloudSQL pool cerrado")
 
     async def get_deposit_for_processing(self, deposit_id: str) -> Optional[DepositRow]:

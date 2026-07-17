@@ -75,62 +75,59 @@ async def _process_deposit_async(deposit_id: str, banco_id: str):
     # 1. Conectar BD
     await _db.connect()
 
+    deposit = await _db.get_deposit_for_processing(deposit_id)
+    if not deposit or not deposit.get("imagen_voucher"):
+        return {"status": "error", "error_type": "no_image"}
+    
+    logger.info("Depósito cargado", deposit_id=deposit_id)
+    
+    # 4. Descargar archivo de GCS
+    imagen_voucher = deposit.get("imagen_voucher")
+    file_bytes = _storage.download_voucher(imagen_voucher)
+    content_type = _storage.get_content_type(imagen_voucher)
+    file_type = content_type.split("/")[-1] if "/" in content_type else "jpeg"
+
+    logger.info("Archivo descargado", deposit_id=deposit_id, file_type=file_type, size=len(file_bytes))
+
     try:
-        deposit = await _db.get_deposit_for_processing(deposit_id)
-        if not deposit or not deposit.get("imagen_voucher"):
-            return {"status": "error", "error_type": "no_image"}
-        
-        logger.info("Depósito cargado", deposit_id=deposit_id)
-        
-        # 4. Descargar archivo de GCS
-        imagen_voucher = deposit.get("imagen_voucher")
-        file_bytes = _storage.download_voucher(imagen_voucher)
-        content_type = _storage.get_content_type(imagen_voucher)
-        file_type = content_type.split("/")[-1] if "/" in content_type else "jpeg"
-
-        logger.info("Archivo descargado", deposit_id=deposit_id, file_type=file_type, size=len(file_bytes))
-
-        try:
-            # Extraer con schema dinámico (sin prompt)
-            llama_data = await _llama.extract(file_bytes, file_type, banco_id=banco_id)
-        except LlamaParserError as e:
-            # IA falló -> actualizar estado a "procesado" y publicar error
-            await _db.update_deposit_status_only(deposit_id, "procesado")
-            await _redis_queue.publish_result({
-                "deposit_id": deposit_id,
-                "status": "error_ia",
-                "error_type": e.error_code,
-                "error_message": str(e)
-            })
-            return {"status": "error_ia"}
-        
-        numero_operacion = normalize_numero_operacion(banco_id, llama_data.numero_operacion or "")
-        
-        # 10. Preparar datos para actualización
-        update_data = DepositUpdateData(
-            monto=llama_data.monto,
-            moneda=llama_data.moneda or "PEN",
-            fecha_deposito=llama_data.fecha_deposito,
-            numero_operacion=numero_operacion,
-            estado="procesado" # <- SIEMPRE procesado
-        )
-        
-        # 11. Actualizar BD
-        success = await _db.update_deposit(deposit_id, update_data)
-        
-        if not success:
-            raise RuntimeError("Falló actualización BD")
-        
-        # PUBLICAR RESULTADO EN REDIS
+        # Extraer con schema dinámico (sin prompt)
+        llama_data = await _llama.extract(file_bytes, file_type, banco_id=banco_id)
+    except LlamaParserError as e:
+        # IA falló -> actualizar estado a "procesado" y publicar error
+        await _db.update_deposit_status_only(deposit_id, "procesado")
         await _redis_queue.publish_result({
             "deposit_id": deposit_id,
-            "status": "success",
-            "error_type": None,
-            "error_message": None,
+            "status": "error_ia",
+            "error_type": e.error_code,
+            "error_message": str(e)
         })
+        return {"status": "error_ia"}
+    
+    numero_operacion = normalize_numero_operacion(banco_id, llama_data.numero_operacion or "")
+    
+    # 10. Preparar datos para actualización
+    update_data = DepositUpdateData(
+        monto=llama_data.monto,
+        moneda=llama_data.moneda or "PEN",
+        fecha_deposito=llama_data.fecha_deposito,
+        numero_operacion=numero_operacion,
+        estado="procesado" # <- SIEMPRE procesado
+    )
+    
+    # 11. Actualizar BD
+    success = await _db.update_deposit(deposit_id, update_data)
+    
+    if not success:
+        raise RuntimeError("Falló actualización BD")
+    
+    # PUBLICAR RESULTADO EN REDIS
+    await _redis_queue.publish_result({
+        "deposit_id": deposit_id,
+        "status": "success",
+        "error_type": None,
+        "error_message": None,
+    })
 
-        logger.info("Resultado publicado en Redis", deposit_id=deposit_id)
+    logger.info("Resultado publicado en Redis", deposit_id=deposit_id)
 
-        return {"status": "success"}
-    finally:
-        await _db.close()
+    return {"status": "success"}

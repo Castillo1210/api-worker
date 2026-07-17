@@ -27,16 +27,22 @@ async def consume_redis_loop():
                 for msg in messages:
                     deposit_id = msg.get("deposit_id") or msg.get("data")
                     banco_id = msg.get("banco_id")
-                    if deposit_id:
-                        if isinstance(deposit_id, str) and deposit_id.startswith("{"):
-                            import json
-                            data = json.loads(deposit_id)
-                            deposit_id = data.get("deposit_id")
-                            banco_id = data.get("banco_id") or banco_id
+                    msg_id = msg.get("_msg_id")
+                    try:
                         if deposit_id:
-                            print(f">>> [CONSUMER] ¡Mensaje recibido! Encolando a Celery...", flush=True)
-                            process_deposit.delay(str(deposit_id), banco_id)
-                            await client.ack_process([msg.get("_msg_id")])
+                            if isinstance(deposit_id, str) and deposit_id.startswith("{"):
+                                import json
+                                data = json.loads(deposit_id)
+                                deposit_id = data.get("deposit_id")
+                                banco_id = data.get("banco_id") or banco_id
+                            if deposit_id:
+                                print(f">>> [CONSUMER] ¡Mensaje recibido! Encolando a Celery...", flush=True)
+                                process_deposit.delay(str(deposit_id), banco_id)
+                        await client.ack_process([msg_id])
+                    except Exception as e:
+                        print(f">>> [CONSUMER] Error encolando mensaje {msg_id}: {e}", flush=True)
+                        await client.move_to_dlq(msg, str(e))
+                        await client.ack_process([msg_id])
             except Exception as e:
                 print(f">>> [CONSUMER] Error dentro del loop: {str(e)}", flush=True)
                 await asyncio.sleep(5)

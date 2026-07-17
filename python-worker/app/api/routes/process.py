@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Header
+from app.config import get_settings
 from pydantic import BaseModel
 from typing import Optional
 import structlog
@@ -9,7 +10,13 @@ from app.worker import celery_app
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/process-deposit", tags=["Process"])
+settings = get_settings()
+
+async def verify_internal_secret(x_internal_secret: str = Header(None)):
+    if x_internal_secret != settings.INTERNAL_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+router = APIRouter(prefix="/process-deposit", tags=["Process"], dependencies=[Depends(verify_internal_secret)])
 
 class TaskResponse(BaseModel):
     task_id: str

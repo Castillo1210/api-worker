@@ -25,6 +25,8 @@ _storage: StorageClient = None
 _llama: LlamaParserClient = None
 _redis_queue: RedisQueueClient = None
 
+_loop: asyncio.AbstractEventLoop = None
+
 
 def _init_services():
     global _db, _storage, _llama, _redis_queue
@@ -33,6 +35,13 @@ def _init_services():
         _storage = StorageClient()
         _llama = LlamaParserClient(SchemaRegistry(), _db)
         _redis_queue = RedisQueueClient()
+
+def _get_worker_loop():
+    global _loop
+    if _loop is None or _loop.is_closed():
+        _loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_loop)
+    return _loop
 
 
 @shared_task(
@@ -53,9 +62,10 @@ def process_deposit(self, deposit_id: str, banco_id: str):
     _init_services()
 
     start_time = time.time()
+    loop = _get_worker_loop()
 
     try:
-        result = asyncio.run(_process_deposit_async(deposit_id, banco_id))
+        result = loop.run_until_complete(_process_deposit_async(deposit_id, banco_id))
 
         duration = time.time() - start_time
         deposit_processing_duration_seconds.observe(duration)

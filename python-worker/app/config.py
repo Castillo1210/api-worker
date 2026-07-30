@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     LLAMA_PARSER_API_KEY: str = ""
     LLAMA_PARSER_TIMEOUT: float = 30.0
     LLAMA_PARSER_MAX_RETRIES: int = 3
+    LLAMA_PARSE_CONFIG_ID: str = "cfg-cmryhcdd4wtak6k2q180opswl3i0"
     LLAMA_PARSER_RETRY_BACKOFF: float = 2.0
 
     # API Bridge (SignalR callback)

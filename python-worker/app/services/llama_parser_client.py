@@ -77,7 +77,8 @@ class LlamaParserClient:
                     configuration={
                         "data_schema": schema_class.model_json_schema(),
                         "extraction_target": "per_doc",
-                        "tier": "agentic",
+                        "tier": "cost_effective",
+                        "parse_config_id": self.settings.LLAMA_PARSE_CONFIG_ID,
                     },
                 )
 

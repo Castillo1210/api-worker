@@ -11,7 +11,7 @@ if not hasattr(builtins, 'MetadataFilters'):
 
 from llama_cloud import LlamaCloud
 
-client = LlamaCloud(api_key=os.environ["LLAMA_CLOUD_API_KEY"])
+client = LlamaCloud(api_key=os.environ["LLAMA_PARSER_API_KEY"])
 
 # 1. Ver qué configuraciones parse_v2 existen bajo esta key/proyecto
 existing = client.get(

@@ -1,6 +1,7 @@
 # check_and_create_parse_config.py
 import os
 import builtins
+from typing import Any, Dict
 from pydantic import BaseModel
 
 # Shim necesario (igual que en llama_parser_client.py) antes de importar llama_cloud
@@ -16,7 +17,7 @@ client = LlamaCloud(api_key=os.environ["LLAMA_PARSER_API_KEY"])
 # 1. Ver qué configuraciones parse_v2 existen bajo esta key/proyecto
 existing = client.get(
     "/api/v1/beta/configurations",
-    cast_to=dict,
+    cast_to=Dict[str, Any],
     options={"params": {"product_type": "parse_v2"}},
 )
 print("Parse configs (parse_v2) visibles con esta key:")
@@ -34,6 +35,6 @@ parse_config = client.post(
             "tier": "fast",
         },
     },
-    cast_to=dict,
+    cast_to=Dict[str, Any],
 )
 print(f"\nNuevo Parse config ID (usar este en LLAMA_PARSE_CONFIG_ID): {parse_config['id']}")

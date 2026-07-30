@@ -1,8 +1,17 @@
 # check_and_create_parse_config.py
 import os
+import builtins
+from pydantic import BaseModel
+
+# Shim necesario (igual que en llama_parser_client.py) antes de importar llama_cloud
+if not hasattr(builtins, 'MetadataFilters'):
+    class MetadataFilters(BaseModel):
+        pass
+    builtins.MetadataFilters = MetadataFilters
+
 from llama_cloud import LlamaCloud
 
-client = LlamaCloud(api_key=os.environ["LLAMA_PARSER_API_KEY"])
+client = LlamaCloud(api_key=os.environ["LLAMA_CLOUD_API_KEY"])
 
 # 1. Ver qué configuraciones parse_v2 existen bajo esta key/proyecto
 existing = client.get(

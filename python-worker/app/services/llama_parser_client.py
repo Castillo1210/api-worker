@@ -107,7 +107,11 @@ class LlamaParserClient:
 
                 logger.info("LlamaCloud extracción exitosa", fields=list(data.keys()) if isinstance(data, dict) else None, raw_data=data)
                 return response_class.model_validate(data)
-            except LlamaParserError:
+            except LlamaParserError as e:
+                last_error = e
+                logger.warning("Error en llamada LlamaCloud, reintentando", attempt=attempt +1, error_code=e.error_code, error=str(e))
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(2**attempt)
                 raise
             except Exception as e:
                 last_error = e

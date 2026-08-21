@@ -59,6 +59,16 @@ class Settings(BaseSettings):
     REDIS_MAX_RETRIES: int = 3
     REDIS_RETRY_DELAY: float = 1.0
 
+    # Google Document AI
+    DOCUMENT_AI_ENABLED: bool = False
+    DOCUMENT_AI_PROJECT_ID: str = ""
+    DOCUMENT_AI_LOCATION: str = "us"
+    DOCUMENT_AI_PROCESSOR_ID: str = ""
+    DOCUMENT_AI_CREDENTIALS_PATH: Optional[str] = None
+
+    # Vision OCR (chequeo)
+    VISION_CREDENTIALS_PATH: Optional[str] = None
+
     # Validación Calidad (OpenCV heurísticas v1)
     QUALITY_MIN_WIDTH: int = 800
     QUALITY_MIN_HEIGHT: int = 600

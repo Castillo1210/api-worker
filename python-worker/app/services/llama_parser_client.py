@@ -79,6 +79,7 @@ class LlamaParserClient:
                         "extraction_target": "per_doc",
                         "tier": "cost_effective",
                         "parse_config_id": self.settings.LLAMA_PARSE_CONFIG_ID,
+                        "confidence_scores": True
                     },
                 )
 
@@ -90,7 +91,10 @@ class LlamaParserClient:
                             error_code="IA_TIMEOUT",
                         )
                     await asyncio.sleep(2)
-                    job = await client.extract.get(job.id)
+                    try:
+                        job = await client.extract.get(job.id, expand=["extract_metadata"])
+                    except TypeError:
+                        job = await client.extract.get(job.id)
 
                 if job.status == "FAILED":
                     error_msg = getattr(job, "error", None) or getattr(job, "error_message", None) or "Unknown error"
@@ -104,6 +108,20 @@ class LlamaParserClient:
                     data = data.model_dump()
                 if data is None:
                     raise LlamaParserError("LlamaCloud no devolvió extract_result", error_code="IA_NO_RESULT")
+
+                extract_metadata = getattr(job, "extract_metadata", None)
+                if hasattr(extract_metadata, "model_dump"):
+                    extract_metadata = extract_metadata.model_dump()
+
+                field_confidence = {}
+                if isinstance(extract_metadata, dict):
+                    campos_metadata = (extract_metadata.get("field_metadata") or {}).get("document_metadata") or {}
+                    for campo, meta in campos_metadata.items():
+                        if isinstance(meta, dict) and meta.get("confidence") is not None:
+                            field_confidence[campo] = meta["confidence"]
+
+                data = dict(data) if isinstance(data, dict) else data
+                data["field_confidences"] = field_confidence
 
                 logger.info("LlamaCloud extracción exitosa", fields=list(data.keys()) if isinstance(data, dict) else None, raw_data=data)
                 return response_class.model_validate(data)

@@ -132,14 +132,25 @@ async def _process_deposit_async(deposit_id: str, banco_id: str):
         texto_ocr = await asyncio.to_thread(obtener_texto_ocr, file_bytes, es_pdf)
 
         conf = llama_data.field_confidences or {}
-        r_monto = resolver_campo(llama_data.monto, extraer_montos(texto_ocr), lambda a, b: abs(a - b) < 0.01, conf.get("monto"))
+        r_monto = resolver_campo(
+            llama_data.monto,
+            extraer_montos(texto_ocr),
+            lambda a, b: abs(float(a) - float(b)) < 0.01,
+            conf.get("monto"),
+        )
         r_moneda = resolver_campo(llama_data.moneda, extraer_monedas(texto_ocr), lambda a, b: a == b, conf.get("moneda"))
-        r_fecha = resolver_campo(fecha_iso, extraer_fechas(texto_ocr), lambda a, b: a == b, conf.get("fecha_deposito"))
+        r_fecha = resolver_campo(
+            fecha_iso,
+            extraer_fechas(texto_ocr),
+            lambda a, b: str(a)[:10] == str(b)[:10],
+            conf.get("fecha_deposito"),
+        )
 
-        if not fecha_es_plausible(fecha_iso):
+        fecha_verificada = r_fecha["valor_final"]
+        if fecha_verificada not in (None, "") and not fecha_es_plausible(fecha_verificada):
             r_fecha = {
-                "accion": "revision_manual", "valor_final": fecha_iso, "candidatos": r_fecha["candidatos"],
-                "motivo": f"Año implausible: la IA dijo {fecha_iso!r}, distinto al año actual.",
+                "accion": "revision_manual", "valor_final": fecha_verificada, "candidatos": r_fecha["candidatos"],
+                "motivo": f"Año implausible: se obtuvo {fecha_verificada!r}, distinto al año actual.",
             }
 
         monto_final, moneda_final, fecha_final = r_monto["valor_final"], r_moneda["valor_final"], r_fecha["valor_final"]
@@ -153,10 +164,20 @@ async def _process_deposit_async(deposit_id: str, banco_id: str):
             "llama_field_confidence": conf,
             "ocr_candidatos": {"monto": r_monto["candidatos"], "moneda": r_moneda["candidatos"], "fecha_deposito": r_fecha["candidatos"]},
         }
-    except Exception as e:
-        # Si Vision falla, no bloqueamos el depósito -- seguimmos solo con la IA
+        logger.info(
+            "Chequeo OCR completado",
+            deposit_id=deposit_id,
+            monto_accion=r_monto["accion"],
+            moneda_accion=r_moneda["accion"],
+            fecha_accion=r_fecha["accion"],
+            monto_candidatos=r_monto["candidatos"],
+            moneda_candidatos=r_moneda["candidatos"],
+            fecha_candidatos=r_fecha["candidatos"],
+        )
+    except Exception:
+        # Si Vision falla, no bloqueamos el depósito -- seguimos solo con la IA
         # sin datos_ocr (el frontend no muestra ninguna alerta de color en ese caso)
-        logger.warning("Chequeo OCR falló, se sgiue solo con LlamaCloud", deposit_id=deposit_id, error=str(e))
+        logger.exception("Chequeo OCR falló; se continúa solo con LlamaCloud", deposit_id=deposit_id)
     
     # 10. Preparar datos para actualización
     update_data = DepositUpdateData(

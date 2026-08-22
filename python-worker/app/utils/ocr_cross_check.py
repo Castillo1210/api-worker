@@ -22,8 +22,6 @@ UMBRAL_CONFIANZA_ALTA = 0.85
 def extraer_montos(texto: str) -> List[float]:
     montos = []
     for match in _MONTO_PATTERN.finditer(texto):
-        #raw = match.group(1)
-        #raw = raw.replace(",", "") if raw.count(".") <= 1 else raw.replace(".", "").replace(",", ".")
         try:
             montos.append(_normalizar_monto(match.group(1)))
         except ValueError:
@@ -67,54 +65,88 @@ def extraer_fechas(texto: str) -> List[str]:
     return fechas
 
 
-def fecha_es_plausible(fecha_str: Optional[str], referencia: Optional[date] = None, dias_gracia_fin_de_anio: int = 10) -> bool:
-    if not fecha_str:
+def fecha_es_plausible(fecha_valor: Any, referencia: Optional[date] = None, dias_gracia_fin_de_anio: int = 10) -> bool:
+    if not fecha_valor:
         return False
     referencia = referencia or date.today()
-    try:
-        fecha = date.fromisoformat(fecha_str)
-    except ValueError:
-        return False
+    if isinstance(fecha_valor, date):
+        fecha = fecha_valor
+    else:
+        try:
+            fecha = date.fromisoformat(str(fecha_valor)[:10])
+        except (TypeError, ValueError):
+            return False
     if fecha.year == referencia.year:
         return True
     en_gracia_de_enero = referencia.month == 1 and referencia.day <= dias_gracia_fin_de_anio
     es_diciembre_del_anio_anterior = fecha.year == referencia.year - 1 and fecha.month == 12
     return en_gracia_de_enero and es_diciembre_del_anio_anterior
 
-def resolver_campo(valor_actual: Any, candidatos: List[Any], comparador, confianza_ia: Optional[float] = None, umbral: float = UMBRAL_CONFIANZA_ALTA) -> Dict[str, Any]:
+def resolver_campo(
+    valor_actual: Any,
+    candidatos: List[Any],
+    comparador,
+    confianza_ia: Optional[float] = None,
+    umbral: float = UMBRAL_CONFIANZA_ALTA,
+) -> Dict[str, Any]:
     candidatos_unicos = list(dict.fromkeys(candidatos))
+    valor_ausente = valor_actual is None or (
+        isinstance(valor_actual, str) and not valor_actual.strip()
+    )
 
-    if valor_actual is not None and any(comparador(valor_actual, c) for c in candidatos_unicos):
-        return {"accion": "ninguna", "valor_final": valor_actual, "candidatos": candidatos_unicos, "motivo": ""}
-
-    if len(candidatos_unicos) == 1:
+    if not valor_ausente and any(comparador(valor_actual, c) for c in candidatos_unicos):
         return {
-            "accion": "auto_corregido",
-            "valor_final": candidatos_unicos[0],
+            "accion": "ninguna",
+            "valor_final": valor_actual,
             "candidatos": candidatos_unicos,
-            "motivo": f"IA dijo {valor_actual!r}, OCR detectó únicamente {candidatos_unicos[0]!r} -> se usó el de OCR.",
+            "motivo": "Llama y OCR coinciden.",
         }
 
-    if len(candidatos_unicos) == 0:
-        if confianza_ia is not None and confianza_ia >= umbral:
+    if not candidatos_unicos:
+        if not valor_ausente and confianza_ia is not None and confianza_ia >= umbral:
             return {
                 "accion": "ninguna_confianza_alta",
                 "valor_final": valor_actual,
                 "candidatos": candidatos_unicos,
-                "motivo": f"OCR no detectó nada, pero la IA reportó confianza alta ({confianza_ia:.2f}).",
+                "motivo": f"OCR no detectó un valor, pero Llama reportó confianza alta ({confianza_ia:.2f}).",
             }
         return {
             "accion": "revision_manual",
             "valor_final": valor_actual,
             "candidatos": candidatos_unicos,
-            "motivo": f"OCR no detectó nada y la confianza de la IA es {('desconocida' if confianza_ia is None else f'baja ({confianza_ia:.2f})')}.",
+            "motivo": "OCR no detectó candidatos y el valor de Llama no pudo confirmarse.",
+        }
+
+    if len(candidatos_unicos) == 1 and valor_ausente:
+        candidato = candidatos_unicos[0]
+        return {
+            "accion": "auto_corregido",
+            "valor_final": candidato,
+            "candidatos": candidatos_unicos,
+            "motivo": f"Llama no obtuvo un valor y OCR detectó {candidato!r}.",
+        }
+
+    if len(candidatos_unicos) == 1:
+        candidato = candidatos_unicos[0]
+        confianza_texto = "desconocida" if confianza_ia is None else f"{confianza_ia:.2f}"
+        return {
+            "accion": "revision_manual",
+            "valor_final": valor_actual,
+            "candidatos": candidatos_unicos,
+            "motivo": (
+                f"Llama obtuvo {valor_actual!r} con confianza {confianza_texto}, "
+                f"pero OCR detectó {candidato!r}. Se conservó el valor de Llama."
+            ),
         }
 
     return {
         "accion": "revision_manual",
         "valor_final": valor_actual,
         "candidatos": candidatos_unicos,
-        "motivo": f"IA dijo {valor_actual!r}, OCR dio candidatos ambiguos: {candidatos_unicos}.",
+        "motivo": (
+            f"Llama obtuvo {valor_actual!r}, pero OCR detectó varios candidatos: "
+            f"{candidatos_unicos}. Se conservó el valor de Llama."
+        ),
     }
 
 
@@ -151,4 +183,4 @@ def _normalizar_monto(raw: str) -> float:
     else:
         normalizado = raw.replace(",", "").replace(".", "")
 
-    return round(float(normalizado), 2) 
+    return round(float(normalizado), 2)

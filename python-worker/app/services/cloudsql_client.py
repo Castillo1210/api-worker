@@ -106,7 +106,7 @@ class CloudSQLClient:
             "Moneda": data.moneda,
             "FechaDeposito": data.fecha_deposito,
             "NumeroOperacion": data.numero_operacion,
-            "DatosOcr": json.dumps(data.datos_ocr, default=str)
+            "DatosOcr": json.dumps(data.datos_ocr, ensure_ascii=False, default=str)
                 if data.datos_ocr is not None
                 else None,
             "Estado": data.estado,
@@ -132,8 +132,6 @@ class CloudSQLClient:
             success = result.startswith("UPDATE")
             logger.info("Depósito actualizado", deposit_id=deposit_id, estado=data.estado, result=result)
             return success
-
-        logger.info("Depósito actualizado", deposit_id=deposit_id, estado=estado)
 
     async def update_deposit_status_only(self, deposit_id: str, estado: str, motivo_rechazo: Optional[str] = None) -> bool:
         """Actualiza solo estado y el motivo rechazo"""

@@ -22,10 +22,10 @@ UMBRAL_CONFIANZA_ALTA = 0.85
 def extraer_montos(texto: str) -> List[float]:
     montos = []
     for match in _MONTO_PATTERN.finditer(texto):
-        raw = match.group(1)
-        raw = raw.replace(",", "") if raw.count(".") <= 1 else raw.replace(".", "").replace(",", ".")
+        #raw = match.group(1)
+        #raw = raw.replace(",", "") if raw.count(".") <= 1 else raw.replace(".", "").replace(",", ".")
         try:
-            montos.append(round(float(raw), 2))
+            montos.append(_normalizar_monto(match.group(1)))
         except ValueError:
             continue
     return montos
@@ -123,4 +123,32 @@ def puede_autoclasificar_antiguo(resultado_fecha: Dict[str, Any], confianza_fech
         return True, "coincidencia_exacta"
     if resultado_fecha["accion"] == "auto_corregido" and confianza_fecha is not None and confianza_fecha >= umbral:
         return True, "auto_corregido_confianza_alta"
-    return False, "no_califica" 
+    return False, "no_califica"
+
+def _normalizar_monto(raw: str) -> float:
+    raw = raw.replace(" ", "").strip()
+
+    ultima_coma = raw.rfind(",")
+    ultimo_punto = raw.rfind(".")
+
+    if ultima_coma >= 0 and ultimo_punto >= 0:
+        separador_decimal = "," if ultima_coma > ultimo_punto else "."
+    elif ultima_coma >= 0:
+        decimales = len(raw) - ultima_coma - 1
+        separador_decimal = "," if decimales in (1, 2) else None
+    elif ultimo_punto >= 0:
+        decimales = len(raw) - ultimo_punto - 1
+        separador_decimal = "." if decimales in (1, 2) else None
+    else:
+        separador_decimal = None
+
+    if separador_decimal:
+        miles = "." if separador_decimal == "," else ","
+        normalizado = raw.replace(miles, "")
+        entero, decimal = normalizado.rsplit(separador_decimal, 1)
+        entero = entero.replace(separador_decimal, "")
+        normalizado = f"{entero}.{decimal}"
+    else:
+        normalizado = raw.replace(",", "").replace(".", "")
+
+    return round(float(normalizado), 2) 

@@ -1,4 +1,5 @@
 import asyncpg
+import json
 from typing import Optional, List
 from uuid import UUID
 from datetime import date, datetime
@@ -105,6 +106,9 @@ class CloudSQLClient:
             "Moneda": data.moneda,
             "FechaDeposito": data.fecha_deposito,
             "NumeroOperacion": data.numero_operacion,
+            "DatosOcr": json.dumps(data.datos_ocr, default=str)
+                if data.datos_ocr is not None
+                else None,
             "Estado": data.estado,
         }
         

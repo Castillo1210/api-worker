@@ -106,6 +106,7 @@ class CloudSQLClient:
             "Moneda": data.moneda,
             "FechaDeposito": data.fecha_deposito,
             "NumeroOperacion": data.numero_operacion,
+            "NumeroTarjeta": data.numero_tarjeta,
             "DatosOcr": json.dumps(data.datos_ocr, ensure_ascii=False, default=str)
                 if data.datos_ocr is not None
                 else None,

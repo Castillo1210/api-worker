@@ -19,7 +19,7 @@ from app.services.metrics import (
 )
 from app.services.vision_ocr_client import obtener_texto_ocr
 from app.utils.ocr_cross_check import (
-    extraer_fechas, extraer_monedas, extraer_montos,
+    extraer_fechas, extraer_monedas, extraer_montos, extraer_numero_tarjeta,
     fecha_es_plausible, resolver_campo, UMBRAL_CONFIANZA_ALTA,
 )
 
@@ -127,6 +127,14 @@ async def _process_deposit_async(deposit_id: str, banco_id: str):
     datos_ocr = None
     monto_final, moneda_final, fecha_final = llama_data.monto, llama_data.moneda, fecha_iso
 
+
+    _tiene_numero_tarjeta = hasattr(llama_data, "numero_tarjeta")
+    numero_tarjeta_final = None
+    if _tiene_numero_tarjeta:
+        numero_tarjeta_final = "".join(
+            c for c in str(getattr(llama_data, "numero_tarjeta", "") or "") if c.isdigit()
+        )[-4:] or None
+
     try:
         es_pdf = file_type == "pdf"
         texto_ocr = await asyncio.to_thread(obtener_texto_ocr, file_bytes, es_pdf)
@@ -155,14 +163,27 @@ async def _process_deposit_async(deposit_id: str, banco_id: str):
 
         monto_final, moneda_final, fecha_final = r_monto["valor_final"], r_moneda["valor_final"], r_fecha["valor_final"]
 
+        r_tarjeta = None
+        if _tiene_numero_tarjeta:
+            r_tarjeta = resolver_campo(
+                numero_tarjeta_final,
+                extraer_numero_tarjeta(texto_ocr),
+                lambda a, b: a == b,
+                conf.get("numero_tarjeta"),
+            )
+            numero_tarjeta_final = r_tarjeta["valor_final"]
+
         datos_ocr = {
             "verificacion": {
                 "monto": {"accion": r_monto["accion"], "motivo": r_monto["motivo"]},
                 "moneda": {"accion": r_moneda["accion"], "motivo": r_moneda["motivo"]},
                 "fecha_deposito": {"accion": r_fecha["accion"], "motivo": r_fecha["motivo"]},
+                **({"numero_tarjeta": {"accion": r_tarjeta["accion"], "motivo": r_tarjeta["motivo"]}} if r_tarjeta else {}),
             },
             "llama_field_confidence": conf,
-            "ocr_candidatos": {"monto": r_monto["candidatos"], "moneda": r_moneda["candidatos"], "fecha_deposito": r_fecha["candidatos"]},
+            "ocr_candidatos": {"monto": r_monto["candidatos"], "moneda": r_moneda["candidatos"], "fecha_deposito": r_fecha["candidatos"],
+                                **({"numero_tarjeta": r_tarjeta["candidatos"]} if r_tarjeta else {}),
+                            },
         }
         logger.info(
             "Chequeo OCR completado",
@@ -185,6 +206,7 @@ async def _process_deposit_async(deposit_id: str, banco_id: str):
         moneda=moneda_final or "PEN",
         fecha_deposito=fecha_final,
         numero_operacion=numero_operacion,
+        numero_tarjeta=numero_tarjeta_final, # NUEVO
         datos_ocr=datos_ocr,
         estado="procesado" # <- SIEMPRE procesado
     )

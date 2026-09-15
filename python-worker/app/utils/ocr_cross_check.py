@@ -12,12 +12,22 @@ _FECHA_TEXTO_PATTERN = re.compile(r"(\d{1,2})\s+([a-zA-Zé]{3,12})\.?\s+(\d{4})"
 _FECHA_NUMERICA_PATTERN = re.compile(r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b")
 _FECHA_SIN_ANIO_PATTERN = re.compile(r"(\d{1,2})\s+([a-zA-Zé]{3,12})\.(?=[,\s]|$)", re.IGNORECASE)
 
+_TARJETA_MASCARADA_PATTERN = re.compile(r"\d{4,8}\*{2,8}(\d{4})\b")
+_TARJETA_SOLO_ASTERISCOS_PATTERN = re.compile(r"\*{2,8}(\d{4})\b")
+
 _MESES = {
     "ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6,
     "jul": 7, "ago": 8, "sep": 9, "set": 9, "oct": 10, "nov": 11, "dic": 12,
 }
 
 UMBRAL_CONFIANZA_ALTA = 0.85
+
+def extraer_numero_tarjeta(texto: str) -> List[str]:
+    """Últimos 4 dígitos de una tarjeta enmascarada en el texto OCR (ej. Niubiz Pago con Link)."""
+    candidatos = [m.group(1) for m in _TARJETA_MASCARADA_PATTERN.finditer(texto)]
+    if not candidatos:
+        candidatos = [m.group(1) for m in _TARJETA_SOLO_ASTERISCOS_PATTERN.finditer(texto)]
+    return candidatos
 
 def extraer_montos(texto: str) -> List[float]:
     montos = []
